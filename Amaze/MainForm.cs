@@ -1,11 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.ComponentModel;
-using System.Data;
-using System.Drawing;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using System.Windows.Forms;
 
 namespace Amaze
@@ -15,20 +8,20 @@ namespace Amaze
 		public MainForm()
 		{
 			InitializeComponent();
-			maze = new Maze(25, 50);
+			maze = new Maze(100, 100);
 			SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.UserPaint | ControlStyles.OptimizedDoubleBuffer, true);
 		}
 
-		Maze maze;
+		readonly Maze maze;
 
 		protected override void OnClick(EventArgs e)
 		{
 			base.OnClick(e);
 			maze.Clear();
-			int i = 0;
+			var i = 0;
 			maze.Initialize(() =>
 			{
-				if (i % 1 == 0)
+				if (i % 500 == 0)
 				{
 					Invalidate();
 					Application.DoEvents();
@@ -41,7 +34,7 @@ namespace Amaze
 		protected override void OnPaint(PaintEventArgs e)
 		{
 			base.OnPaint(e);
-			maze.Draw(e.Graphics, 35);
+			maze.Draw(e.Graphics, 10);
 		}
 	}
 }

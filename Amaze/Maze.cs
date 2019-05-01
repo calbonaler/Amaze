@@ -14,9 +14,8 @@ namespace Amaze
 			Clear();
 		}
 
-		bool[,] m_HorizontalWalls;
-		bool[,] m_VerticalWalls;
-		int[,] m_ClusterNumbers;
+		readonly bool[,] m_HorizontalWalls;
+		readonly bool[,] m_VerticalWalls;
 
 		public int RowCount => m_HorizontalWalls.GetLength(0);
 		public int ColumnCount => m_VerticalWalls.GetLength(1);
@@ -42,91 +41,84 @@ namespace Amaze
 			var rng = new MersenneTwister();
 
 			// Initialize cluster numbers for all rooms
-			if (m_ClusterNumbers == null)
-				m_ClusterNumbers = new int[RowCount, ColumnCount];
-			var roomCount = 0;
-			foreach (var (i, j) in m_ClusterNumbers.Index())
-				m_ClusterNumbers[i, j] = roomCount++;
+			var clusterNumbers = new int[RowCount, ColumnCount];
 
-			while (true)
+			void UpdateClusterNumber(int row, int column, bool horizontal)
 			{
+				// The wall that we broke separates two room of two different clusters
+				// So, we merge the clusters by simply replacing cluster numbers
+				var nextClusterNumber = horizontal ? clusterNumbers[row, column + 1] : clusterNumbers[row + 1, column];
+				var oldClusterNumber = Math.Max(clusterNumbers[row, column], nextClusterNumber);
+				var newClusterNumber = Math.Min(clusterNumbers[row, column], nextClusterNumber);
+				for (var i = 0; i < clusterNumbers.GetLength(0); i++)
+				{
+					for (var j = 0; j < clusterNumbers.GetLength(1); j++)
+					{
+						if (clusterNumbers[i, j] == oldClusterNumber)
+							clusterNumbers[i, j] = newClusterNumber;
+					}
+				}
+			}
+
+			for (var i = 0; i < RowCount; i++)
+			{
+				for (var j = 0; j < ColumnCount; j++)
+					clusterNumbers[i, j] = i * clusterNumbers.GetLength(1) + j;
+			}
+			for (var i = 0; i < RowCount; i++)
+			{
+				for (var j = 0; j < ColumnCount; j++)
+				{
+					if (j + 1 < ColumnCount && !m_HorizontalWalls[i, j] && clusterNumbers[i, j] != clusterNumbers[i, j + 1])
+						UpdateClusterNumber(i, j, true);
+					if (i + 1 < RowCount && !m_VerticalWalls[i, j] && clusterNumbers[i, j] != clusterNumbers[i + 1, j])
+						UpdateClusterNumber(i, j, false);
+				}
+			}
+
+			// Initialize breakable walls
+			var breakableWalls = new List<(int Row, int Column, bool Horizontal)>();
+			for (var i = 0; i < RowCount; i++)
+			{
+				for (var j = 0; j < ColumnCount; j++)
+				{
+					if (j + 1 < ColumnCount && m_HorizontalWalls[i, j] && clusterNumbers[i, j] != clusterNumbers[i, j + 1])
+						breakableWalls.Add((i, j, true));
+					if (i + 1 < RowCount && m_VerticalWalls[i, j] && clusterNumbers[i, j] != clusterNumbers[i + 1, j])
+						breakableWalls.Add((i, j, false));
+				}
+			}
+
+			while (breakableWalls.Count > 0)
+			{
+				// Select walls from breakable walls stochastically
+				var (row, column, horizontal) = breakableWalls[rng.Next(breakableWalls.Count)];
+
+				// Break selected wall
+				(horizontal ? m_HorizontalWalls : m_VerticalWalls)[row, column] = false;
+
 				// Re-assign cluster numbers for all rooms
-				while (true)
-				{
-					bool reassigned = false;
-					for (int i = 0; i < RowCount; i++)
-					{
-						for (int j = 0; j < ColumnCount; j++)
-						{
-							if (j + 1 < ColumnCount && !m_HorizontalWalls[i, j] && m_ClusterNumbers[i, j] != m_ClusterNumbers[i, j + 1])
-							{
-								m_ClusterNumbers[i, j] = m_ClusterNumbers[i, j + 1] = Math.Min(m_ClusterNumbers[i, j], m_ClusterNumbers[i, j + 1]);
-								reassigned = true;
-							}
-							if (i + 1 < RowCount && !m_VerticalWalls[i, j] && m_ClusterNumbers[i, j] != m_ClusterNumbers[i + 1, j])
-							{
-								m_ClusterNumbers[i, j] = m_ClusterNumbers[i + 1, j] = Math.Min(m_ClusterNumbers[i, j], m_ClusterNumbers[i + 1, j]);
-								reassigned = true;
-							}
-						}
-					}
-					if (!reassigned) break;
-				}
+				UpdateClusterNumber(row, column, horizontal);
+
+				// Update breakable walls
+				// Remove walls separating two rooms of same cluster
+				breakableWalls.RemoveAll(x => clusterNumbers[x.Row, x.Column] == (x.Horizontal ? clusterNumbers[x.Row, x.Column + 1] : clusterNumbers[x.Row + 1, x.Column]));
+
 				onReassigned();
-
-				// Stop wall breaking if all the cluster numbers are the same
-				if (m_ClusterNumbers.Cast<int>().Zip(m_ClusterNumbers.Cast<int>().Skip(1), (x, y) => x == y).All(x => x))
-					break;
-
-				// Break walls stochastically
-				bool[,] allWalls;
-				Func<int, int, int> nextRoomClusterNumber;
-				if (rng.Next(2) == 0)
-				{
-					allWalls = m_HorizontalWalls;
-					nextRoomClusterNumber = (i, j) => m_ClusterNumbers[i, j + 1];
-				}
-				else
-				{
-					allWalls = m_VerticalWalls;
-					nextRoomClusterNumber = (i, j) => m_ClusterNumbers[i + 1, j];
-				}
-				List<(int, int)> breakableWalls = new List<(int Row, int Column)>();
-				for (int i = 0; i < allWalls.GetLength(0); i++)
-				{
-					for (int j = 0; j < allWalls.GetLength(1); j++)
-					{
-						if (!allWalls[i, j] || m_ClusterNumbers[i, j] == nextRoomClusterNumber(i, j)) continue;
-						breakableWalls.Add((i, j));
-					}
-				}
-				if (breakableWalls.Count > 0)
-				{
-					var (i, j) = breakableWalls[rng.Next(breakableWalls.Count)];
-					allWalls[i, j] = false;
-				}
 			}
 		}
 		public void Draw(Graphics graphics, int cellSize)
 		{
 			graphics.DrawLine(Pens.Black, 0, 0, cellSize * ColumnCount, 0);
 			graphics.DrawLine(Pens.Black, 0, 0, 0, cellSize * RowCount);
-			using (Font font = new Font("Meiryo", 9))
-			using (StringFormat sf = new StringFormat())
+			for (var i = 0; i < RowCount; i++)
 			{
-				sf.Alignment = StringAlignment.Center;
-				sf.LineAlignment = StringAlignment.Center;
-				for (int i = 0; i < RowCount; i++)
+				for (var j = 0; j < ColumnCount; j++)
 				{
-					for (int j = 0; j < ColumnCount; j++)
-					{
-						if (HasRightWall(i, j))
-							graphics.DrawLine(Pens.Black, (j + 1) * cellSize, i * cellSize, (j + 1) * cellSize, (i + 1) * cellSize);
-						if (HasBottomWall(i, j))
-							graphics.DrawLine(Pens.Black, j * cellSize, (i + 1) * cellSize, (j + 1) * cellSize, (i + 1) * cellSize);
-						if (m_ClusterNumbers != null)
-							graphics.DrawString(m_ClusterNumbers[i, j].ToString(), font, Brushes.Black, new RectangleF(j * cellSize, i * cellSize, cellSize, cellSize), sf);
-					}
+					if (HasRightWall(i, j))
+						graphics.DrawLine(Pens.Black, (j + 1) * cellSize, i * cellSize, (j + 1) * cellSize, (i + 1) * cellSize);
+					if (HasBottomWall(i, j))
+						graphics.DrawLine(Pens.Black, j * cellSize, (i + 1) * cellSize, (j + 1) * cellSize, (i + 1) * cellSize);
 				}
 			}
 		}
@@ -155,7 +147,7 @@ namespace Amaze
 		const uint LowerMask = 0x7fffffffU; // least significant r bits
 		static readonly uint[] mag01 = new[] { 0x0U, 0x9908b0dfU }; // mag01[x] = x * MATRIX_A  for x=0,1
 
-		uint[] m_StateVector;
+		readonly uint[] m_StateVector;
 		int m_StateVectorIndex;
 
 		// generates a random number on [0,0xffffffff]-interval
@@ -182,10 +174,10 @@ namespace Amaze
 			}
 			y = m_StateVector[m_StateVectorIndex++];
 			// Tempering
-			y ^= (y >> 11);
+			y ^= y >> 11;
 			y ^= (y << 7) & 0x9d2c5680U;
 			y ^= (y << 15) & 0xefc60000U;
-			y ^= (y >> 18);
+			y ^= y >> 18;
 			return y;
 		}
 
@@ -215,9 +207,9 @@ namespace Amaze
 
 		public override void NextBytes(byte[] buffer)
 		{
-			int j = 0;
+			var j = 0;
 			uint sample = 0;
-			for (int i = 0; i < buffer.Length; i++)
+			for (var i = 0; i < buffer.Length; i++)
 			{
 				if (j <= 0)
 				{
