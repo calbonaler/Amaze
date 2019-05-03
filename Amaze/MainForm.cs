@@ -32,12 +32,15 @@ namespace Amaze
 				tslStatus.Text = "Column Count: Validation failed";
 				return;
 			}
-			m_Maze = new Maze(rowCount, columnCount);
+			if (m_Maze != null && rowCount == m_Maze.RowCount && columnCount == m_Maze.ColumnCount)
+				m_Maze.Clear();
+			else
+				m_Maze = new Maze(rowCount, columnCount);
 			picViewer.Invalidate();
 			var previousProgress = 0;
 			await m_Maze.Generate(new Progress<int>(progress =>
 			{
-				tslStatus.Text = "Generation: " + progress + "% Completed";
+				tslStatus.Text = "Generation: " + progress + "% completed";
 				if (progress - previousProgress >= 10)
 				{
 					picViewer.Invalidate();
