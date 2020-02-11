@@ -38,7 +38,7 @@ namespace Amaze
 				m_Maze = new Maze(rowCount, columnCount);
 			picViewer.Invalidate();
 			var previousProgress = 0;
-			await m_Maze.Generate(new Progress<int>(progress =>
+			await m_Maze.GenerateAsync(new Progress<int>(progress =>
 			{
 				tslStatus.Text = "Generation: " + progress + "% completed";
 				if (progress - previousProgress >= 10)

@@ -165,7 +165,7 @@ namespace Amaze
 					m_VerticalWalls[i, j] = true;
 			}
 		}
-		public Task Generate(IProgress<int> progress = null) => Task.Run(() => GenerateCore(progress));
+		public Task GenerateAsync(IProgress<int> progress = null) => Task.Run(() => GenerateCore(progress));
 		public bool Solve(int startR, int startC, int goalR, int goalC)
 		{
 			bool HasWall(int row, int column, int direction)
