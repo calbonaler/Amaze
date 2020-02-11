@@ -17,7 +17,7 @@ namespace Amaze
 		readonly object m_LockObject = new object();
 		readonly bool[,] m_HorizontalWalls;
 		readonly bool[,] m_VerticalWalls;
-		(int R, int C)[] m_SolvedPath;
+		(int R, int C)[]? m_SolvedPath;
 
 		static readonly (int R, int C)[] s_Directions = new[] { (0, 1), (1, 0), (0, -1), (-1, 0) };
 
@@ -73,7 +73,7 @@ namespace Amaze
 				m_VerticalWalls[row, column] = value;
 		}
 
-		void GenerateCore(IProgress<int> progress)
+		void GenerateCore(IProgress<int>? progress)
 		{
 			var rng = new MersenneTwister();
 
@@ -165,24 +165,24 @@ namespace Amaze
 					m_VerticalWalls[i, j] = true;
 			}
 		}
-		public Task GenerateAsync(IProgress<int> progress = null) => Task.Run(() => GenerateCore(progress));
+		public Task GenerateAsync(IProgress<int>? progress = null) => Task.Run(() => GenerateCore(progress));
 		public bool Solve(int startR, int startC, int goalR, int goalC)
 		{
 			bool HasWall(int row, int column, int direction)
 			{
 				lock (m_LockObject)
 				{
-					switch (direction)
+					return direction switch
 					{
-						case 1: return row >= RowCount - 1 || m_VerticalWalls[row, column];
-						case 2: return column <= 0 || m_HorizontalWalls[row, column - 1];
-						case 3: return row <= 0 || m_VerticalWalls[row - 1, column];
-						default: return column >= ColumnCount - 1 || m_HorizontalWalls[row, column];
-					}
+						1 => row >= RowCount - 1 || m_VerticalWalls[row, column],
+						2 => column <= 0 || m_HorizontalWalls[row, column - 1],
+						3 => row <= 0 || m_VerticalWalls[row - 1, column],
+						_ => column >= ColumnCount - 1 || m_HorizontalWalls[row, column],
+					};
 				}
 			}
 
-			var agentState = new SolverAgentState(startR, startC);
+			SolverAgentState? agentState = new SolverAgentState(startR, startC);
 			var searchStates = new Stack<SolverAgentState>();
 			while (agentState.Row != goalR || agentState.Column != goalC)
 			{
@@ -233,7 +233,7 @@ namespace Amaze
 		class SolverAgentState
 		{
 			public SolverAgentState(int row, int column) : this(row, column, null) { }
-			SolverAgentState(int row, int column, SolverAgentState lastState)
+			SolverAgentState(int row, int column, SolverAgentState? lastState)
 			{
 				Row = row;
 				Column = column;
@@ -242,15 +242,10 @@ namespace Amaze
 
 			public int Row { get; }
 			public int Column { get; }
-			public SolverAgentState LastState { get; }
+			public SolverAgentState? LastState { get; }
 
 			public SolverAgentState Move(int direction) => new SolverAgentState(Row + s_Directions[direction].R, Column + s_Directions[direction].C, this);
-			public int? ComputeInverseDirection()
-			{
-				if (LastState == null)
-					return null;
-				return Array.IndexOf(s_Directions, (LastState.Row - Row, LastState.Column - Column));
-			}
+			public int? ComputeInverseDirection() => LastState == null ? null : (int?)Array.IndexOf(s_Directions, (LastState.Row - Row, LastState.Column - Column));
 		}
 	}
 
@@ -298,8 +293,8 @@ namespace Amaze
 					y = (m_StateVector[i] & UpperMask) | (m_StateVector[i + 1] & LowerMask);
 					m_StateVector[i] = m_StateVector[i + (M - m_StateVector.Length)] ^ (y >> 1) ^ mag01[y & 0x1UL];
 				}
-				y = (m_StateVector[m_StateVector.Length - 1] & UpperMask) | (m_StateVector[0] & LowerMask);
-				m_StateVector[m_StateVector.Length - 1] = m_StateVector[M - 1] ^ (y >> 1) ^ mag01[y & 0x1UL];
+				y = (m_StateVector[^1] & UpperMask) | (m_StateVector[0] & LowerMask);
+				m_StateVector[^1] = m_StateVector[M - 1] ^ (y >> 1) ^ mag01[y & 0x1UL];
 				m_StateVectorIndex = 0;
 			}
 			y = m_StateVector[m_StateVectorIndex++];

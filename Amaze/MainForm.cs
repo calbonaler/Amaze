@@ -12,7 +12,7 @@ namespace Amaze
 		}
 
 		int m_CellSize;
-		Maze m_Maze;
+		Maze? m_Maze;
 
 		protected override void OnLoad(EventArgs e)
 		{
@@ -58,16 +58,10 @@ namespace Amaze
 				result = m_Maze.Solve(0, 0, m_Maze.RowCount - 1, m_Maze.ColumnCount - 1);
 				picViewer.Invalidate();
 			}
-			if (result)
-				tslStatus.Text = "Solved successfully!";
-			else
-				tslStatus.Text = "Solving failed";
+			tslStatus.Text = result ? "Solved successfully!" : "Solving failed";
 		}
 
-		private void PicViewer_Paint(object sender, PaintEventArgs e)
-		{
-			m_Maze?.Draw(e.Graphics, m_CellSize);
-		}
+		private void PicViewer_Paint(object sender, PaintEventArgs e) => m_Maze?.Draw(e.Graphics, m_CellSize);
 
 		private void TstCellSize_KeyPress(object sender, KeyPressEventArgs e)
 		{
